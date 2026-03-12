@@ -1,0 +1,22 @@
+name: sequence_generation
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - pip
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - scikit-learn
+  - pytorch
+  - pytorch-cuda=12.1
+  - torchvision
+  - torchaudio
+  - pip:
+      - evodiff
+      - sequence-models
+      - loralib

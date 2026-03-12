@@ -1,0 +1,6 @@
+{
+    "invalid_energy_threshold": 100,
+    "num_model": 1,
+    "num_gpu": 1,
+    "prediction_batch_size":10000
+}

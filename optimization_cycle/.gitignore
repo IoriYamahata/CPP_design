@@ -1,0 +1,17 @@
+# data/output
+input_data/
+results/
+
+# DiffDock outputs / external repo
+DiffDock/
+diffdock/DiffDock/
+diffdock/result/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS
+.DS_Store

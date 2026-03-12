@@ -1,0 +1,12 @@
+{   
+    "docking_number_per_GPU": 12,
+    "GPU_num_per_device": 1,
+    "inference_steps": 20,
+    "samples_per_complex": 20,
+    "batch_size": 5,
+    "actual_steps": 18,
+    "bind_cliteria_distance__angstrom": 4.2,
+    "crash_cliteria_distance__angstrom": 1.0,
+    "gamma": 0.1,
+    "rho": 0.3
+}

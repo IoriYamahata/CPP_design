@@ -1,0 +1,40 @@
+name: optimization_cycle
+channels:
+  - pytorch
+  - nvidia
+  - pyg
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - pip
+  - numpy=1.26.4
+  - pandas=1.2.2
+  - scipy
+  - matplotlib=3.5.2
+  - seaborn=0.11.2
+  - tqdm
+  - mpi4py
+  - parmed
+  - pytorch=2.2.*
+  - pytorch-cuda=12.1
+  - torchvision=0.17.*
+  - torchaudio=2.2.*
+  - rdkit
+  - openbabel
+  - pyg
+  - pytorch-scatter
+  - pytorch-sparse
+  - pytorch-cluster
+  - pytorch-spline-conv
+  - pip:
+      - botorch
+      - gpytorch
+      - linear-operator
+      - gmx_MMPBSA==1.6.3
+      - PyYAML
+      - biopython
+      - spyrmsd
+      - biopandas
+      - e3nn
+      - fair-esm

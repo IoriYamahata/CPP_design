@@ -1,0 +1,14 @@
+{
+    "batch_size": 500,
+    "learning_rate": 1e-5,
+    "num_epochs": 5000,
+    "max_seq_length": 18,
+    "num_convolution_layers": 2,
+    "layer_hidden_dim": 64,
+    "layer1_kernel_size": 3,
+    "layer1_dilation": 1,
+    "layer2_kernel_size": 5,
+    "layer2_dilation": 2,
+    "dropout_prob": 0.1,
+    "patience": 200
+  }

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Local-friendly defaults; override via environment variables as needed.
+input_num_assemblies_per_job="${INPUT_NUM_ASSEMBLIES_PER_JOB:-20}"
+input_num_CPUs="${INPUT_NUM_CPUS:-4}"
+MD_num_assemblies_per_job="${MD_NUM_ASSEMBLIES_PER_JOB:-1}"
+MD_num_CPUs="${MD_NUM_CPUS:-8}"
+MD_num_GPUs="${MD_NUM_GPUS:-1}"
+energy_num_assemblies_per_job="${ENERGY_NUM_ASSEMBLIES_PER_JOB:-4}"
+
+procedure_dir=$1
+
+export INPUT_NUM_ASSEMBLIES_PER_JOB="${input_num_assemblies_per_job}"
+export INPUT_NUM_CPUS="${input_num_CPUs}"
+export MD_NUM_ASSEMBLIES_PER_JOB="${MD_num_assemblies_per_job}"
+export MD_NUM_CPUS="${MD_num_CPUs}"
+export MD_NUM_GPUS="${MD_num_GPUs}"
+export ENERGY_NUM_ASSEMBLIES_PER_JOB="${energy_num_assemblies_per_job}"
+export PROCEDURE_DIR="${procedure_dir}"
+
+
+export SCHRODINGER="/opt/schrodinger2025-3/"

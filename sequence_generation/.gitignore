@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Outputs
+results/
+data/sequences/
+data/generated_data/
+models/predictor/
+
+# Notebooks
+*.ipynb
+
+# OS
+.DS_Store

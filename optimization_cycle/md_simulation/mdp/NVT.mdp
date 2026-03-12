@@ -1,0 +1,50 @@
+define                  =
+;
+integrator              = md
+nsteps                  = 50000
+dt                      = 0.002
+;
+nstxout                 = 0
+nstvout                 = 0
+nstfout                 = 0
+nstenergy               = 0
+nstlog                  = 500
+;
+continuation            = no
+constraints             = hbonds
+constraint_algorithm    = lincs
+lincs_iter              = 1
+lincs_order             = 4
+;
+cutoff-scheme           = Verlet
+verlet-buffer-tolerance = 1.0e-6
+nstlist                 = 10
+rcoulomb                = 1.2
+rcoulomb-switch         = 1.1
+rvdw                    = 1.2
+rvdw-switch             = 1.1
+;
+coulombtype             = PME
+pme_order               = 4
+fourierspacing          = 0.11
+ewald-rtol              = 1.0e-6
+;
+tcoupl                  = V-rescale
+tc-grps                 = Protein Non-Protein
+tau_t                   = 0.1     0.1
+ref_t                   = 310     310
+;
+pcoupl                  = no
+;
+pbc                     = xyz
+;
+DispCorr                = EnerPres
+;
+gen_vel                 = yes
+gen_temp                = 0
+gen_seed                = -1
+;
+annealing               = single single
+annealing_npoints       = 2      2
+annealing_time          = 0 100  0 100
+annealing_temp          = 0 310  0 310

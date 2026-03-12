@@ -1,0 +1,13 @@
+{   
+    "optimize_method_list":[{"receptor": "CXCR4", "optimization_method":"maximize"},
+                            {"receptor": "NRP1" , "optimization_method":"minimize"}],
+    "q": 10,    
+    "num_models": 12,
+    "max_batch_size": 10000,
+    "ref_point_list":[7.79, -5.21],
+    "prune_baseline": true,
+    "alpha": 0.0,
+    "max_iep": 0,
+    "cache_root": false,
+    "unique": true
+  }
