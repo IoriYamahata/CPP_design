@@ -5,10 +5,16 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 
+from datetime import datetime, timezone
 from pathlib import Path
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import (
+    roc_auc_score, average_precision_score,
+    f1_score, precision_score, recall_score, confusion_matrix,
+)
 
 
 AMINO_ACID_DICT = {
@@ -111,11 +117,13 @@ def _infer_sequence_column(df: pd.DataFrame) -> str:
 def main():
     repo_root = Path(__file__).resolve().parents[1]
     data_dir = repo_root / "data"
-    models_dir = repo_root / "models" / "predictor"
-    models_dir.mkdir(parents=True, exist_ok=True)
+    results_dir = repo_root / "results"
+    results_dir.mkdir(parents=True, exist_ok=True)
 
     parser = argparse.ArgumentParser(description="Train CPP classifier and run predictions.")
     parser.add_argument("--mode", choices=["train", "predict"], default="train")
+    parser.add_argument("--checkpoint", type=Path, default=None,
+                        help="Path to checkpoint .pt (predict mode). Defaults to results/best_checkpoint.pt.")
 
     parser.add_argument("--filtered-csv", default=str(data_dir / "processed_data" / "filtered_sequence.csv"))
     parser.add_argument("--test-csv", default=str(data_dir / "processed_data" / "biomolecules-2162660_Supplementary Spreadsheets S1 Test Set.csv"))
@@ -130,13 +138,22 @@ def main():
 
     parser.add_argument("--d-model", type=int, default=16)
     parser.add_argument("--hidden-size", type=int, default=16)
+    parser.add_argument("--max-len", type=int, default=38,
+                        help="Max sequence length (required if checkpoint lacks metadata).")
 
     args = parser.parse_args()
 
+    if args.mode == "predict" and args.checkpoint is None:
+        parser.error("--checkpoint is required when --mode predict")
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    best_path = models_dir / "best_checkpoint.pt"
 
     if args.mode == "train":
+        current_dt = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        run_dir = results_dir / f"{current_dt}_classifier"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        best_path = run_dir / "best_checkpoint.pt"
+
         filtered_df = pd.read_csv(args.filtered_csv)
 
         seq_col = _infer_sequence_column(filtered_df)
@@ -171,6 +188,7 @@ def main():
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
         best_val_loss = float("inf")
+        train_losses, val_losses = [], []
 
         for epoch in range(args.epochs):
             model.train()
@@ -198,8 +216,11 @@ def main():
 
             avg_train = running_loss / max(1, len(train_loader))
             avg_val = val_loss / max(1, len(val_loader))
+            train_losses.append(avg_train)
+            val_losses.append(avg_val)
 
-            if avg_val < best_val_loss:
+            improved = avg_val < best_val_loss
+            if improved:
                 best_val_loss = avg_val
                 torch.save(
                     {
@@ -213,11 +234,25 @@ def main():
                     best_path,
                 )
 
-            print(f"Epoch {epoch+1}/{args.epochs} - train_loss={avg_train:.4f} val_loss={avg_val:.4f}")
+            mark = " ★ best" if improved else ""
+            print(f"Epoch {epoch+1}/{args.epochs} - train_loss={avg_train:.4f} val_loss={avg_val:.4f}{mark}")
 
-        print(f"Saved best checkpoint: {best_path}")
+        # ── Loss curve ───────────────────────────────────────────────────────────
+        epochs_range = range(1, args.epochs + 1)
+        plt.figure()
+        plt.plot(epochs_range, train_losses, label="Train loss")
+        plt.plot(epochs_range, val_losses,   label="Val loss")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.title("Training and Validation Loss")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(run_dir / "loss_curve.png")
+        plt.close()
 
-        # --- Independent test set evaluation ---
+        print(f"\nSaved best checkpoint: {best_path}")
+
+        # ── Independent test set evaluation ─────────────────────────────────────
         test_df = pd.read_csv(args.test_csv)
         test_seq_col = _infer_sequence_column(test_df)
         test_lab_col = _infer_label_column(test_df)
@@ -232,8 +267,7 @@ def main():
 
         test_loader = DataLoader(CPPDataset(test_seqs, test_labels), batch_size=args.batch_size, shuffle=False)
 
-        # Reload best checkpoint for evaluation
-        best_ckpt = torch.load(best_path, map_location=device)
+        best_ckpt = torch.load(best_path, map_location=device, weights_only=False)
         best_model = CPPClassifier(
             num_amino_acids=int(best_ckpt["num_amino_acids"]),
             d_model=int(best_ckpt["d_model"]),
@@ -245,37 +279,91 @@ def main():
         best_model.eval()
 
         test_loss = 0.0
-        correct = 0
-        total = 0
+        all_probs, all_labels = [], []
         with torch.no_grad():
             for batch_data, batch_label in test_loader:
                 batch_data = batch_data.to(device)
                 batch_label = batch_label.to(device)
                 logits = best_model(batch_data)
                 test_loss += criterion(logits, batch_label).item()
-                preds = (torch.sigmoid(logits) >= 0.5).float()
-                correct += (preds == batch_label).sum().item()
-                total += batch_label.size(0)
+                probs = torch.sigmoid(logits).cpu().numpy().reshape(-1)
+                all_probs.append(probs)
+                all_labels.append(batch_label.cpu().numpy().reshape(-1))
+
+        all_probs  = np.concatenate(all_probs)
+        all_labels = np.concatenate(all_labels).astype(int)
+        all_preds  = (all_probs >= 0.5).astype(int)
 
         avg_test_loss = test_loss / max(1, len(test_loader))
-        accuracy = correct / total if total > 0 else 0.0
-        print(f"Test set results: loss={avg_test_loss:.4f}, accuracy={accuracy:.4f} ({correct}/{total})")
+        accuracy  = (all_preds == all_labels).mean()
+        auc       = roc_auc_score(all_labels, all_probs)
+        auprc     = average_precision_score(all_labels, all_probs)
+        f1        = f1_score(all_labels, all_preds, zero_division=0)
+        precision = precision_score(all_labels, all_preds, zero_division=0)
+        recall    = recall_score(all_labels, all_preds, zero_division=0)
+        tn, fp, fn, tp = confusion_matrix(all_labels, all_preds).ravel()
+
+        lines = [
+            f"Test set results",
+            f"  loss      = {avg_test_loss:.4f}",
+            f"  accuracy  = {accuracy:.4f}  ({(all_preds == all_labels).sum()}/{len(all_labels)})",
+            f"  AUC-ROC   = {auc:.4f}",
+            f"  AUC-PR    = {auprc:.4f}",
+            f"  F1        = {f1:.4f}",
+            f"  Precision = {precision:.4f}",
+            f"  Recall    = {recall:.4f}",
+            f"  TP={tp}  FP={fp}  FN={fn}  TN={tn}",
+            f"",
+            f"best_val_loss = {best_val_loss:.4f}",
+            f"epochs        = {args.epochs}",
+        ]
+        for line in lines:
+            print(line)
+
+        with open(run_dir / "test_results.txt", "w") as f:
+            f.write("\n".join(lines) + "\n")
+
+        return  # train done
+
+    # ── Predict mode ─────────────────────────────────────────────────────────────
+    best_path = args.checkpoint if args.checkpoint is not None else results_dir / "best_checkpoint.pt"
 
     if not best_path.exists():
         raise FileNotFoundError(f"Trained checkpoint not found: {best_path}")
 
-    ckpt = torch.load(best_path, map_location=device)
-    max_len = int(ckpt["max_len"])
+    ckpt = torch.load(best_path, map_location=device, weights_only=False)
+
+    # Support both new format (with metadata) and old format (state_dict only)
+    if "max_len" in ckpt:
+        max_len         = int(ckpt["max_len"])
+        num_amino_acids = int(ckpt["num_amino_acids"])
+        d_model         = int(ckpt["d_model"])
+        hidden_size     = int(ckpt["hidden_size"])
+        dropout_prob    = float(ckpt["dropout"])
+        state_dict      = ckpt["state_dict"]
+    else:
+        if args.max_len is None:
+            parser.error("Checkpoint has no metadata. Specify --max-len (and optionally --d-model, --hidden-size, --dropout).")
+        max_len         = args.max_len
+        num_amino_acids = len(AMINO_ACID_DICT)
+        d_model         = args.d_model
+        hidden_size     = args.hidden_size
+        dropout_prob    = args.dropout
+        state_dict      = ckpt.get("model_state_dict", ckpt)
 
     model = CPPClassifier(
-        num_amino_acids=int(ckpt["num_amino_acids"]),
-        d_model=int(ckpt["d_model"]),
-        hidden_size=int(ckpt["hidden_size"]),
-        dropout_prob=float(ckpt["dropout"]),
+        num_amino_acids=num_amino_acids,
+        d_model=d_model,
+        hidden_size=hidden_size,
+        dropout_prob=dropout_prob,
         max_seq_length=max_len,
     ).to(device)
-    model.load_state_dict(ckpt["state_dict"])
+    model.load_state_dict(state_dict)
     model.eval()
+
+    current_dt = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    pred_dir = results_dir / f"{current_dt}_predictions"
+    pred_dir.mkdir(parents=True, exist_ok=True)
 
     for label, path in [("lora", args.lora_csv), ("default", args.default_csv)]:
         p = Path(path)
@@ -291,7 +379,7 @@ def main():
 
         preds = predict(model, dl, device)
 
-        out_path = models_dir / f"{label}_predictions.csv"
+        out_path = pred_dir / f"{label}_predictions.csv"
         pd.DataFrame({seq_col: df[seq_col], "Prediction": preds}).to_csv(out_path, index=False)
         print(f"Saved predictions: {out_path}")
 

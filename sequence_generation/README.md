@@ -14,7 +14,7 @@ conda activate sequence_generation
 - `data/cellppd/` : CPP training sequences (`cpp_data_1.txt`, `cpp_data_2.txt`, `cpp_data_3.txt`)
 - `models/evodiff/` : downloaded pretrained EvoDiff weights (`*.tar`)
 - `models/paper/` : fine-tuned checkpoints for generation (optional)
-- `data/sequences/` : generated sequence CSVs (output)
+- `data/generated_data/` : generated sequence CSVs (output)
 - `models/predictor/` : classifier outputs
 
 ## Finetuning
@@ -53,10 +53,19 @@ python scripts/classifier.py --mode train
 
 Predict:
 ```
-python scripts/classifier.py --mode predict
+python scripts/classifier.py --mode predict \
+  --checkpoint results/<run_dir>/best_checkpoint.pt
 ```
 
-Outputs:
-- `models/predictor/best_model_state_dict.pt`
-- `models/predictor/lora_predictions.csv`
-- `models/predictor/oadm_predictions.csv`
+Using pre-trained weights from the paper
+```
+python scripts/classifier.py --mode predict \
+  --checkpoint models/paper/classifier/best_checkpoint.pt
+```
+
+Outputs (under `results/`):
+- `results/<YYYYMMDD_HHMMSS>_classifier/best_checkpoint.pt`
+- `results/<YYYYMMDD_HHMMSS>_classifier/loss_curve.png`
+- `results/<YYYYMMDD_HHMMSS>_classifier/test_results.txt`
+- `results/<YYYYMMDD_HHMMSS>_predictions/lora_predictions.csv`
+- `results/<YYYYMMDD_HHMMSS>_predictions/default_predictions.csv`
